@@ -42,7 +42,8 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
         this(apiKey, cseId, DEFAULT_HTTP_TIMEOUT, 10);
     }
 
-    public GeminiCitationFetcher(String apiKey, String cseId, Duration httpTimeout, int maxResults) throws CitationException {
+    public GeminiCitationFetcher(String apiKey, String cseId, Duration httpTimeout, int maxResults)
+            throws CitationException {
         validateInputs(apiKey, cseId);
 
         this.httpTimeout = httpTimeout != null ? httpTimeout : DEFAULT_HTTP_TIMEOUT;
@@ -50,38 +51,40 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
 
         try {
             this.webSearchEngine = GoogleCustomWebSearchEngine.builder()
-                .apiKey(apiKey)
-                .csi(cseId)
-                .includeImages(false)
-                .logRequests(false)
-                .logResponses(false)
-                .build();
+                    .apiKey(apiKey)
+                    .csi(cseId)
+                    .includeImages(false)
+                    .logRequests(false)
+                    .logResponses(false)
+                    .build();
 
             this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(DEFAULT_CONNECT_TIMEOUT)
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+                    .connectTimeout(DEFAULT_CONNECT_TIMEOUT)
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
 
             this.executor = Executors.newVirtualThreadPerTaskExecutor();
 
             logger.info("GeminiCitationFetcher initialized with timeout: " + this.httpTimeout);
 
         } catch (Exception e) {
-            throw new CitationException("Failed to initialize Gemini citation fetcher: " + e.getMessage(), e, "initialization", "GEMINI");
+            throw new CitationException("Failed to initialize Gemini citation fetcher: " + e.getMessage(), e,
+                    "initialization", "GEMINI");
         }
     }
 
     public GeminiCitationFetcher(Research4jConfig config) throws CitationException {
-        this(config.getGoogleSearchApiKey(), config.getGoogleCseId(), config.getRequestTimeout(), config.getMaxCitations());
+        this(config.getGoogleSearchApiKey(), config.getGoogleCseId(), config.getRequestTimeout(),
+                config.getMaxCitations());
     }
 
     private void validateInputs(String apiKey, String cseId) {
         if (apiKey == null || apiKey.trim()
-            .isEmpty()) {
+                .isEmpty()) {
             throw new IllegalArgumentException("Google Search API key cannot be null or empty");
         }
         if (cseId == null || cseId.trim()
-            .isEmpty()) {
+                .isEmpty()) {
             throw new IllegalArgumentException("Google CSE ID cannot be null or empty");
         }
     }
@@ -93,7 +96,7 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
         }
 
         if (query == null || query.trim()
-            .isEmpty()) {
+                .isEmpty()) {
             throw new IllegalArgumentException("Query cannot be null or empty");
         }
 
@@ -103,21 +106,21 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
             WebSearchResults results = webSearchEngine.search(query);
 
             if (results == null || results.results()
-                .isEmpty()) {
+                    .isEmpty()) {
                 logger.warning("No search results found for query: " + query);
                 return List.of();
             }
 
             List<CompletableFuture<CitationResult>> futures = results.results()
-                .stream()
-                .limit(maxResults)
-                .map(result -> fetchCitationAsync(result, query))
-                .toList();
+                    .stream()
+                    .limit(maxResults)
+                    .map(result -> fetchCitationAsync(result, query))
+                    .toList();
 
             return futures.stream()
-                .map(this::safeGet)
-                .filter(citation -> citation != null && citation.isValid())
-                .toList();
+                    .map(this::safeGet)
+                    .filter(citation -> citation != null && citation.isValid())
+                    .toList();
 
         } catch (Exception e) {
             logger.severe("Failed to fetch citations: " + e.getMessage());
@@ -125,38 +128,39 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
         }
     }
 
-    private CompletableFuture<CitationResult> fetchCitationAsync(dev.langchain4j.web.search.WebSearchOrganicResult result, String originalQuery) {
+    private CompletableFuture<CitationResult> fetchCitationAsync(
+            dev.langchain4j.web.search.WebSearchOrganicResult result, String originalQuery) {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String url = result.url()
-                    .toString();
+                        .toString();
                 String content = fetchContentWithTimeout(url);
                 double relevanceScore = calculateRelevanceScore(result, originalQuery);
 
                 return CitationResult.builder()
-                    .title(result.title())
-                    .snippet(result.snippet())
-                    .content(content)
-                    .url(url)
-                    .relevanceScore(relevanceScore)
-                    .retrievedAt(LocalDateTime.now())
-                    .language(detectLanguage(content))
-                    .build();
+                        .title(result.title())
+                        .snippet(result.snippet())
+                        .content(content)
+                        .url(url)
+                        .relevanceScore(relevanceScore)
+                        .retrievedAt(LocalDateTime.now())
+                        .language(detectLanguage(content))
+                        .build();
 
             } catch (Exception e) {
                 logger.warning("Failed to fetch content from URL: " + result.url() + " - " + e.getMessage());
 
                 return CitationResult.builder()
-                    .title(result.title())
-                    .snippet(result.snippet())
-                    .content(result.snippet())
-                    .url(result.url()
-                        .toString())
-                    .relevanceScore(0.5)
-                    .retrievedAt(LocalDateTime.now())
-                    .language("unknown")
-                    .build();
+                        .title(result.title())
+                        .snippet(result.snippet())
+                        .content(result.snippet())
+                        .url(result.url()
+                                .toString())
+                        .relevanceScore(0.5)
+                        .retrievedAt(LocalDateTime.now())
+                        .language("unknown")
+                        .build();
             }
         }, executor);
     }
@@ -164,11 +168,11 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
     private String fetchContentWithTimeout(String url) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(httpTimeout)
-                .header("User-Agent", "Research4j/1.0 (+https://github.com/venkat1701/research4j)")
-                .GET()
-                .build();
+                    .uri(URI.create(url))
+                    .timeout(httpTimeout)
+                    .header("User-Agent", "Research4j/1.0 (+https://github.com/venkat1701/research4j)")
+                    .GET()
+                    .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
@@ -179,17 +183,17 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
 
             String htmlContent = response.body();
             if (htmlContent == null || htmlContent.trim()
-                .isEmpty()) {
+                    .isEmpty()) {
                 return "No content available";
             }
 
             Document doc = Jsoup.parse(htmlContent);
 
             doc.select("script, style, nav, footer, header")
-                .remove();
+                    .remove();
 
             String textContent = doc.body()
-                .text();
+                    .text();
 
             if (textContent.length() > MAX_CONTENT_LENGTH) {
                 textContent = textContent.substring(0, MAX_CONTENT_LENGTH) + "...";
@@ -206,7 +210,7 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
         } catch (Exception e) {
             logger.warning("Error fetching content from " + url + ": " + e.getMessage());
             return "Content not available (error: " + e.getClass()
-                .getSimpleName() + ")";
+                    .getSimpleName() + ")";
         }
     }
 
@@ -215,9 +219,9 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
             double score = 0.0;
             String queryLower = query.toLowerCase();
             String titleLower = result.title()
-                .toLowerCase();
+                    .toLowerCase();
             String snippetLower = result.snippet()
-                .toLowerCase();
+                    .toLowerCase();
 
             if (titleLower.contains(queryLower)) {
                 score += 0.4;
@@ -246,8 +250,8 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
             }
 
             String url = result.url()
-                .toString()
-                .toLowerCase();
+                    .toString()
+                    .toLowerCase();
             if (url.contains("wikipedia") || url.contains("edu") || url.contains("gov")) {
                 score += 0.15;
             } else if (url.contains("stackoverflow") || url.contains("github")) {
@@ -272,13 +276,14 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
 
     private String detectLanguage(String content) {
         if (content == null || content.trim()
-            .isEmpty()) {
+                .isEmpty()) {
             return "unknown";
         }
 
         String contentLower = content.toLowerCase();
 
-        if (contentLower.contains(" the ") || contentLower.contains(" and ") || contentLower.contains(" is ") || contentLower.contains(" of ")) {
+        if (contentLower.contains(" the ") || contentLower.contains(" and ") || contentLower.contains(" is ")
+                || contentLower.contains(" of ")) {
             return "en";
         }
 
@@ -301,7 +306,7 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
 
         try {
             List<CitationResult> results = fetch("test query");
-            return true;
+            return results != null && !results.isEmpty();
         } catch (Exception e) {
             logger.warning("Health check failed: " + e.getMessage());
             return false;
@@ -342,7 +347,7 @@ public class GeminiCitationFetcher implements CitationFetcher, AutoCloseable {
         } catch (InterruptedException e) {
             executor.shutdownNow();
             Thread.currentThread()
-                .interrupt();
+                    .interrupt();
             logger.warning("Interrupted during shutdown");
         } catch (Exception e) {
             logger.warning("Error during shutdown: " + e.getMessage());
