@@ -1,6 +1,5 @@
 package io.github.venkat1701.citation.service;
 
-
 import static io.github.venkat1701.citation.enums.CitationSource.TAVILY;
 
 import java.util.List;
@@ -16,22 +15,28 @@ public class CitationService {
     private final CitationFetcher citationFetcher;
 
     public CitationService(CitationConfig citationConfig) throws CitationException {
-        switch(citationConfig.getCitationSource()) {
+        switch (citationConfig.getCitationSource()) {
             case TAVILY -> this.citationFetcher = new TavilyCitationFetcher(citationConfig.getApiKey());
             case GOOGLE_GEMINI -> this.citationFetcher = new GeminiCitationFetcher(citationConfig.getApiKey(), "");
-            default -> throw new IllegalArgumentException("Unsupported CitationSource: " + citationConfig.getCitationSource());
+            default ->
+                throw new IllegalArgumentException("Unsupported CitationSource: " + citationConfig.getCitationSource());
         }
     }
 
     public CitationService(CitationConfig citationConfig, String CSI) throws CitationException {
-        switch(citationConfig.getCitationSource()) {
+        switch (citationConfig.getCitationSource()) {
             case TAVILY -> this.citationFetcher = new TavilyCitationFetcher(citationConfig.getApiKey());
             case GOOGLE_GEMINI -> this.citationFetcher = new GeminiCitationFetcher(citationConfig.getApiKey(), CSI);
-            default -> throw new IllegalArgumentException("Unsupported CitationSource: " + citationConfig.getCitationSource());
+            default ->
+                throw new IllegalArgumentException("Unsupported CitationSource: " + citationConfig.getCitationSource());
         }
     }
 
     public List<CitationResult> search(String query) throws CitationException {
         return this.citationFetcher.fetch(query);
+    }
+
+    public static boolean isTavilySource(CitationConfig citationConfig) {
+        return citationConfig.getCitationSource() == TAVILY;
     }
 }
