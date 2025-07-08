@@ -54,11 +54,12 @@ public class DynamicResearchAgent {
 
     public CompletableFuture<ResearchAgentState> executeNode(String nodeName, ResearchAgentState state) {
         GraphNode<ResearchAgentState> node = router.getNodes()
-            .get(nodeName);
+                .get(nodeName);
 
         if (node == null) {
             logger.warning("Node not found: " + nodeName);
-            return CompletableFuture.completedFuture(state.withError(new IllegalStateException("Node not found: " + nodeName)));
+            return CompletableFuture
+                    .completedFuture(state.withError(new IllegalStateException("Node not found: " + nodeName)));
         }
 
         if (!node.shouldExecute(state)) {
@@ -68,17 +69,17 @@ public class DynamicResearchAgent {
 
         logger.info("Executing node: " + nodeName);
         return node.process(state)
-            .handle((result, throwable) -> {
-                if (throwable != null) {
-                    logger.severe("Error in node " + nodeName + ": " + throwable.getMessage());
-                    if (router.shouldRetry(state, nodeName, (Exception) throwable)) {
-                        return executeNode(nodeName, state).join();
-                    } else {
-                        return state.withError((Exception) throwable);
+                .handle((result, throwable) -> {
+                    if (throwable != null) {
+                        logger.severe("Error in node " + nodeName + ": " + throwable.getMessage());
+                        if (router.shouldRetry(state, nodeName, (Exception) throwable)) {
+                            return executeNode(nodeName, state).join();
+                        } else {
+                            return state.withError((Exception) throwable);
+                        }
                     }
-                }
-                return result;
-            });
+                    return result;
+                });
     }
 
     public CompletableFuture<ResearchAgentState> executePipeline(ResearchAgentState initialState) {
@@ -119,7 +120,8 @@ public class DynamicResearchAgent {
         return pipeline;
     }
 
-    public CompletableFuture<ResearchAgentState> processQuery(String sessionId, String query, UserProfile userProfile, ResearchPromptConfig config) {
+    public CompletableFuture<ResearchAgentState> processQuery(String sessionId, String query, UserProfile userProfile,
+            ResearchPromptConfig config) {
 
         ResearchAgentState initialState = new ResearchAgentState(sessionId, query, userProfile, config);
         return executeGraph(initialState, "start");
@@ -132,60 +134,61 @@ public class DynamicResearchAgent {
 
         List<String> nextNodes = router.determineNextNodes(state, currentNode);
         if (nextNodes.isEmpty()) {
-            return CompletableFuture.completedFuture(state.withError(new IllegalStateException("No next nodes found for: " + currentNode)));
+            return CompletableFuture.completedFuture(
+                    state.withError(new IllegalStateException("No next nodes found for: " + currentNode)));
         }
 
         if (nextNodes.size() == 1) {
             String nextNode = nextNodes.get(0);
             GraphNode<ResearchAgentState> node = router.getNodes()
-                .get(nextNode);
+                    .get(nextNode);
 
             if (node != null && node.shouldExecute(state)) {
                 return node.process(state)
-                    .thenCompose(newState -> {
-                        if (newState.getError() != null) {
-                            return CompletableFuture.completedFuture(newState);
-                        }
-                        return executeGraph(newState, nextNode);
-                    })
-                    .exceptionally(throwable -> state.withError((Exception) throwable));
+                        .thenCompose(newState -> {
+                            if (newState.getError() != null) {
+                                return CompletableFuture.completedFuture(newState);
+                            }
+                            return executeGraph(newState, nextNode);
+                        })
+                        .exceptionally(throwable -> state.withError((Exception) throwable));
             } else {
                 return executeGraph(state, nextNode);
             }
         } else {
             List<CompletableFuture<ResearchAgentState>> futures = nextNodes.stream()
-                .map(nodeName -> {
-                    GraphNode<ResearchAgentState> node = router.getNodes()
-                        .get(nodeName);
-                    if (node != null && node.shouldExecute(state)) {
-                        return node.process(state);
-                    }
-                    return CompletableFuture.completedFuture(state);
-                })
-                .toList();
+                    .map(nodeName -> {
+                        GraphNode<ResearchAgentState> node = router.getNodes()
+                                .get(nodeName);
+                        if (node != null && node.shouldExecute(state)) {
+                            return node.process(state);
+                        }
+                        return CompletableFuture.completedFuture(state);
+                    })
+                    .toList();
 
             return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(v -> {
-                    ResearchAgentState mergedState = state;
-                    for (CompletableFuture<ResearchAgentState> future : futures) {
-                        try {
-                            ResearchAgentState nodeResult = future.join();
-                            if (nodeResult.getError() != null) {
-                                return nodeResult; // Return first error encountered
+                    .thenApply(v -> {
+                        ResearchAgentState mergedState = state;
+                        for (CompletableFuture<ResearchAgentState> future : futures) {
+                            try {
+                                ResearchAgentState nodeResult = future.join();
+                                if (nodeResult.getError() != null) {
+                                    return nodeResult; // Return first error encountered
+                                }
+                                mergedState = mergeStates(mergedState, nodeResult);
+                            } catch (Exception e) {
+                                return state.withError(e);
                             }
-                            mergedState = mergeStates(mergedState, nodeResult);
-                        } catch (Exception e) {
-                            return state.withError(e);
                         }
-                    }
-                    return mergedState;
-                })
-                .thenCompose(mergedState -> {
-                    if (mergedState.getError() != null) {
-                        return CompletableFuture.completedFuture(mergedState);
-                    }
-                    return executeGraph(mergedState, "reasoning_selection");
-                });
+                        return mergedState;
+                    })
+                    .thenCompose(mergedState -> {
+                        if (mergedState.getError() != null) {
+                            return CompletableFuture.completedFuture(mergedState);
+                        }
+                        return executeGraph(mergedState, "reasoning_selection");
+                    });
         }
     }
 
@@ -193,19 +196,27 @@ public class DynamicResearchAgent {
         ResearchAgentState merged = state1.copy();
         ResearchAgentState finalMerged = merged;
         state2.getMetadata()
-            .forEach((key, value) -> {
-                if (value != null) {
-                    finalMerged.getMetadata()
-                        .put(key, value);
-                }
-            });
+                .forEach((key, value) -> {
+                    if (value != null) {
+                        finalMerged.getMetadata()
+                                .put(key, value);
+                    }
+                });
 
         if (state2.getCitations() != null && !state2.getCitations()
-            .isEmpty()) {
+                .isEmpty()) {
             merged = merged.withCitations(state2.getCitations());
         }
 
         return merged;
+    }
+
+    public CitationService getCitationService() {
+        return citationService;
+    }
+
+    public LLMClient getLlmClient() {
+        return llmClient;
     }
 
     public void shutdown() {
@@ -218,7 +229,7 @@ public class DynamicResearchAgent {
         } catch (InterruptedException e) {
             executor.shutdownNow();
             Thread.currentThread()
-                .interrupt();
+                    .interrupt();
         } finally {
             reasoningEngine.shutdown();
         }
