@@ -19,13 +19,13 @@ public class ResearchResult {
 
     public String getAnswer() {
         return state.getFinalResponse() != null ? state.getFinalResponse()
-            .structuredOutput()
-            .toString() : "No answer generated";
+                .structuredOutput()
+                .toString() : "No answer generated";
     }
 
     public String getRawResponse() {
         return state.getFinalResponse() != null ? state.getFinalResponse()
-            .rawText() : "No response generated";
+                .rawText() : "No response generated";
     }
 
     public List<CitationResult> getCitations() {
@@ -60,12 +60,16 @@ public class ResearchResult {
         return state.getQuery();
     }
 
+    public Research4jConfig getConfig() {
+        return config;
+    }
+
     @Override
     public String toString() {
         if (hasError()) {
-            return "ResearchResult{error=" + getError().getMessage() + "}";
+            return "ResearchResult{error=" + getError().getMessage() + ", config=" + config.getAllProperties() + "}";
         }
-        return "ResearchResult{" + "answer='" + getAnswer() + "', " + "citations=" + getCitations().size() + ", " + "processingTime=" + getProcessingTime() +
-            "}";
+        return "ResearchResult{" + "answer='" + getAnswer() + "', " + "citations=" + getCitations().size() + ", "
+                + "processingTime=" + getProcessingTime() + ", config=" + config.getAllProperties() + "}";
     }
 }
