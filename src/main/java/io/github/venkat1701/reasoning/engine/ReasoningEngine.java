@@ -38,51 +38,55 @@ public class ReasoningEngine {
         return strategies;
     }
 
-    public <T>LLMResponse<T> reason(ReasoningMethod reasoningMethod, ResearchContext context, Class<T> outputType) throws LLMClientException {
+    public <T> LLMResponse<T> reason(ReasoningMethod reasoningMethod, ResearchContext context, Class<T> outputType)
+            throws LLMClientException {
         ReasoningStrategy strategy = strategies.get(reasoningMethod);
-        if(strategy == null) {
+        if (strategy == null) {
             throw new IllegalArgumentException("No strategy found for " + reasoningMethod);
         }
 
         return strategy.reason(context, outputType);
     }
 
-    public <T> CompletableFuture<LLMResponse<T>> reasonAsync(ReasoningMethod method, ResearchContext context, Class<T> outputType) {
+    public <T> CompletableFuture<LLMResponse<T>> reasonAsync(ReasoningMethod method, ResearchContext context,
+            Class<T> outputType) {
         ReasoningStrategy strategy = strategies.get(method);
-        if(strategy == null) {
+        if (strategy == null) {
             throw new IllegalArgumentException("No strategy found for " + method);
         }
         return strategy.reasonAsync(context, outputType);
     }
 
-    public <T> CompletableFuture<LLMResponse<T>> reasonWithMultipleStrategies(List<ReasoningMethod> methods, ResearchContext context, Class<T> outputType) {
+    public <T> CompletableFuture<LLMResponse<T>> reasonWithMultipleStrategies(List<ReasoningMethod> methods,
+            ResearchContext context, Class<T> outputType) {
         List<CompletableFuture<LLMResponse<T>>> futures = methods.stream()
-            .map(method -> reasonAsync(method, context, outputType))
-            .toList();
+                .map(method -> reasonAsync(method, context, outputType))
+                .toList();
 
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenApply(v -> {
-                List<LLMResponse<T>> results = futures.stream()
-                    .map(CompletableFuture::join)
-                    .toList();
+                .thenApply(v -> {
+                    List<LLMResponse<T>> results = futures.stream()
+                            .map(CompletableFuture::join)
+                            .toList();
 
-                try {
-                    return combineResults(results, context, outputType);
-                } catch (LLMClientException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+                    try {
+                        return combineResults(results, context, outputType);
+                    } catch (LLMClientException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     public <T> CompletableFuture<LLMResponse<T>> reasonWithAutoStrategy(ResearchContext context, Class<T> outputType) {
         ReasoningMethod selectedMethod = selectOptimalStrategy(context);
         return reasonAsync(selectedMethod, context, outputType);
     }
+
     private ReasoningMethod selectOptimalStrategy(ResearchContext context) {
         String prompt = context.getConfig().userPrompt().toLowerCase();
         int citationCount = context.getCitations().size();
 
-        if (prompt.contains("compare") || prompt.contains("table") || prompt.contains("data")) {
+        if (citationCount > 5 || prompt.contains("compare") || prompt.contains("table") || prompt.contains("data")) {
             return ReasoningMethod.CHAIN_OF_TABLE;
         } else if (prompt.contains("creative") || prompt.contains("brainstorm") || prompt.contains("idea")) {
             return ReasoningMethod.CHAIN_OF_IDEAS;
@@ -91,11 +95,14 @@ public class ReasoningEngine {
         }
     }
 
-    private <T> LLMResponse<T> combineResults(List<LLMResponse<T>> results, ResearchContext context, Class<T> outputType) throws LLMClientException {
+    private <T> LLMResponse<T> combineResults(List<LLMResponse<T>> results, ResearchContext context,
+            Class<T> outputType) throws LLMClientException {
         StringBuilder combinedPrompt = new StringBuilder();
         combinedPrompt.append("You are an expert research assistant.\n\n");
-        combinedPrompt.append("Your task is to **carefully synthesize** multiple independent analyses and produce a **unified, accurate, and insightful answer**.\n");
-        combinedPrompt.append("Carefully weigh the strengths of each viewpoint, resolve any contradictions if present, and prioritize clarity, factual depth, and logical structure.\n\n");
+        combinedPrompt.append(
+                "Your task is to **carefully synthesize** multiple independent analyses and produce a **unified, accurate, and insightful answer**.\n");
+        combinedPrompt.append(
+                "Carefully weigh the strengths of each viewpoint, resolve any contradictions if present, and prioritize clarity, factual depth, and logical structure.\n\n");
 
         combinedPrompt.append("Question:\n").append(context.getConfig().userPrompt()).append("\n\n");
 
@@ -103,9 +110,12 @@ public class ReasoningEngine {
             combinedPrompt.append(String.format("Analysis %d:\n%s\n\n", i + 1, results.get(i).rawText()));
         }
 
-        combinedPrompt.append("Now write a comprehensive synthesis that integrates the key insights from all analyses. ");
-        combinedPrompt.append("Ensure the response is well-structured, technically accurate, and clearly articulated. ");
-        combinedPrompt.append("If any parts conflict, resolve them logically or highlight the uncertainty with reasoning.\n");
+        combinedPrompt
+                .append("Now write a comprehensive synthesis that integrates the key insights from all analyses. ");
+        combinedPrompt
+                .append("Ensure the response is well-structured, technically accurate, and clearly articulated. ");
+        combinedPrompt
+                .append("If any parts conflict, resolve them logically or highlight the uncertainty with reasoning.\n");
 
         return llmClient.complete(combinedPrompt.toString(), outputType);
     }
