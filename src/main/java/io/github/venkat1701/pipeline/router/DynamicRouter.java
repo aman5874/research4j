@@ -23,7 +23,7 @@ public class DynamicRouter {
 
     public void registerNode(String name, GraphNode<ResearchAgentState> node) {
         if (name == null || name.trim()
-            .isEmpty()) {
+                .isEmpty()) {
             throw new IllegalArgumentException("Node name cannot be null or empty");
         }
         if (node == null) {
@@ -59,16 +59,22 @@ public class DynamicRouter {
 
             case "query_analysis" -> {
                 logger.info("Query analysis complete, proceeding to citation fetch");
+                QueryAnalysis analysis = getQueryAnalysis(state);
+                if (analysis != null) {
+                    logger.info("Retrieved QueryAnalysis (for validation or future use): "
+                            + analysis.getClass().getSimpleName());
+                }
                 yield List.of("citation_fetch");
             }
 
             case "citation_fetch" -> {
                 boolean citationsFetched = state.getCitations() != null && !state.getCitations()
-                    .isEmpty();
+                        .isEmpty();
                 if (citationsFetched) {
                     logger.info("Citations fetched successfully, proceeding to reasoning selection");
                 } else {
-                    logger.info("No citations fetched (either not required or none found), proceeding to reasoning selection");
+                    logger.info(
+                            "No citations fetched (either not required or none found), proceeding to reasoning selection");
                 }
                 yield List.of("reasoning_selection");
             }
@@ -108,7 +114,7 @@ public class DynamicRouter {
     private QueryAnalysis getQueryAnalysis(ResearchAgentState state) {
         try {
             Object analysis = state.getMetadata()
-                .get("query_analysis");
+                    .get("query_analysis");
             if (analysis instanceof QueryAnalysis) {
                 return (QueryAnalysis) analysis;
             }
@@ -125,7 +131,7 @@ public class DynamicRouter {
 
         String retryKey = nodeName + RETRY_COUNT_KEY;
         int currentRetries = (Integer) state.getMetadata()
-            .getOrDefault(retryKey, 0);
+                .getOrDefault(retryKey, 0);
 
         if (currentRetries >= MAX_RETRIES) {
             logger.warning("Max retries reached for node: " + nodeName);
@@ -136,26 +142,28 @@ public class DynamicRouter {
 
         if (shouldRetry) {
             state.getMetadata()
-                .put(retryKey, currentRetries + 1);
+                    .put(retryKey, currentRetries + 1);
             logger.info("Retrying node: " + nodeName + " (attempt " + (currentRetries + 1) + "/" + MAX_RETRIES + ")");
         } else {
             logger.info("Non-retryable error for node: " + nodeName + " - " + error.getClass()
-                .getSimpleName());
+                    .getSimpleName());
         }
 
         return shouldRetry;
     }
 
     private boolean isRetryableError(Exception error) {
-        if (error instanceof java.net.SocketTimeoutException || error instanceof java.net.ConnectException || error instanceof java.io.IOException) {
+        if (error instanceof java.net.SocketTimeoutException || error instanceof java.net.ConnectException
+                || error instanceof java.io.IOException) {
             return true;
         }
 
         if (error.getMessage() != null) {
             String message = error.getMessage()
-                .toLowerCase();
-            if (message.contains("timeout") || message.contains("connection reset") || message.contains("service unavailable") ||
-                message.contains("rate limit")) {
+                    .toLowerCase();
+            if (message.contains("timeout") || message.contains("connection reset")
+                    || message.contains("service unavailable") ||
+                    message.contains("rate limit")) {
                 return true;
             }
         }
@@ -168,13 +176,15 @@ public class DynamicRouter {
             return false;
         }
 
-        Map<String, List<String>> validTransitions = Map.of("start", List.of("query_analysis"), "query_analysis", List.of("citation_fetch"),
-            "citation_fetch", List.of("reasoning_selection"), "reasoning_selection", List.of("reasoning_execution"), "reasoning_execution",
-            List.of("end", "reasoning_selection"),
-            "end", List.of());
+        Map<String, List<String>> validTransitions = Map.of("start", List.of("query_analysis"), "query_analysis",
+                List.of("citation_fetch"),
+                "citation_fetch", List.of("reasoning_selection"), "reasoning_selection", List.of("reasoning_execution"),
+                "reasoning_execution",
+                List.of("end", "reasoning_selection"),
+                "end", List.of());
 
         return validTransitions.getOrDefault(fromNode, List.of())
-            .contains(toNode);
+                .contains(toNode);
     }
 
     public void validateRouting(ResearchAgentState state) {
@@ -182,7 +192,8 @@ public class DynamicRouter {
             throw new IllegalStateException("State cannot be null for routing validation");
         }
 
-        List<String> requiredNodes = List.of("query_analysis", "citation_fetch", "reasoning_selection", "reasoning_execution");
+        List<String> requiredNodes = List.of("query_analysis", "citation_fetch", "reasoning_selection",
+                "reasoning_execution");
 
         for (String requiredNode : requiredNodes) {
             if (!nodes.containsKey(requiredNode)) {
@@ -197,7 +208,7 @@ public class DynamicRouter {
         if (state != null && nodeName != null) {
             String retryKey = nodeName + RETRY_COUNT_KEY;
             state.getMetadata()
-                .remove(retryKey);
+                    .remove(retryKey);
             logger.info("Reset retry count for node: " + nodeName);
         }
     }
@@ -209,6 +220,6 @@ public class DynamicRouter {
 
         String retryKey = nodeName + RETRY_COUNT_KEY;
         return (Integer) state.getMetadata()
-            .getOrDefault(retryKey, 0);
+                .getOrDefault(retryKey, 0);
     }
 }
